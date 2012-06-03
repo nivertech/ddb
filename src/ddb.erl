@@ -41,7 +41,7 @@
 -define(DDB_AMZ_PREFIX, "x-amz-").
 
 -define(SIGNATURE_METHOD, "HmacSHA1").
--define(MAX_RETRIES, 1).
+-define(MAX_RETRIES, 4).
 -define(REQUEST_TIMEOUT_MS, 1000). 
 
 %%% Request headers
