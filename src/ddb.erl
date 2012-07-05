@@ -32,7 +32,7 @@
 	 cond_put/3,
          cond_update/4, cond_update/5,
          cond_delete/3, cond_delete/4,
-         now/0, find/3, find/4,
+         now/0, find/3, find/4, scan/3,
 	 q/3, q/4,
 	 range_key_condition/1]).
 
@@ -67,6 +67,7 @@
 -define(TG_UPDATE_ITEM, ?TG_VERSION ++ "UpdateItem").
 -define(TG_DELETE_ITEM, ?TG_VERSION ++ "DeleteItem"). 
 -define(TG_QUERY, ?TG_VERSION ++ "Query").
+-define(TG_SCAN, ?TG_VERSION ++ "Scan").
 
 -define(HTTP_OPTIONS, []).
 
@@ -338,6 +339,18 @@ find(Name, {HashKeyValue, HashKeyType}, RangeKeyCond, StartKey)
 	++ start_key(StartKey),
 
     request(?TG_QUERY, JSON).
+
+%%% Scan all items
+
+-spec scan(tablename(), non_neg_integer(), json()|'none') -> json_reply().
+
+scan(Name, Limit, StartKey) 
+  when is_binary(Name),
+       Limit > 0 ->
+    JSON = (start_key(StartKey) ++ 
+            [{<<"TableName">>, Name},
+             {<<"Limit">>    , Limit}]),
+    request(?TG_SCAN, JSON).
 
 %%% Create a range key condition parameter
 
