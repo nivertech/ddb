@@ -25,7 +25,7 @@
 
 -export([credentials/3, tables/0,
          key_type/2, key_type/4,
-         key_value/2, key_value/4,
+         start_key_value/2, key_value/2, key_value/4,
          create_table/4, describe_table/1, remove_table/1,
          get/2, get/3, put/2, update/3, update/4, 
          delete/2, delete/3, 
@@ -196,6 +196,15 @@ cond_put(Name, Attributes, Condition)
     request(?TG_PUT_ITEM, JSON).
 
 %%% Create a key value, either hash or hash and range.
+
+
+-spec start_key_value(binary(), type()) -> json().
+
+start_key_value(HashKeyValue, HashKeyType)
+  when is_binary(HashKeyValue),
+       is_atom(HashKeyType) ->
+    [{<<"HashKeyElement">>, 
+      [{type(HashKeyType), HashKeyValue}]}].
 
 -spec key_value(binary(), type()) -> json().
 
