@@ -32,12 +32,13 @@
 	 cond_put/3,
          cond_update/4, cond_update/5,
          cond_delete/3, cond_delete/4,
-         now/0, find/3, find/4, scan/3,
+         now/0, find/3, find/4,
 	 q/3, q/4,
+	 scan/2, scan/3,
 	 range_key_condition/1]).
 
 -define(DDB_DOMAIN, "dynamodb.us-east-1.amazonaws.com").
--define(DDB_ENDPOINT, "http://" ++ ?DDB_DOMAIN ++ "/").
+-define(DDB_ENDPOINT, "https://" ++ ?DDB_DOMAIN ++ "/").
 -define(DDB_AMZ_PREFIX, "x-amz-").
 
 -define(SIGNATURE_METHOD, "HmacSHA1").
@@ -349,18 +350,6 @@ find(Name, {HashKeyValue, HashKeyType}, RangeKeyCond, StartKey)
 
     request(?TG_QUERY, JSON).
 
-%%% Scan all items
-
--spec scan(tablename(), non_neg_integer(), json()|'none') -> json_reply().
-
-scan(Name, Limit, StartKey) 
-  when is_binary(Name),
-       Limit > 0 ->
-    JSON = (start_key(StartKey) ++ 
-            [{<<"TableName">>, Name},
-             {<<"Limit">>    , Limit}]),
-    request(?TG_SCAN, JSON).
-
 %%% Create a range key condition parameter
 
 -spec range_key_condition(find_cond()) -> json_parameter().
@@ -400,6 +389,25 @@ q(Name, {HashKeyValue, HashKeyType}, Parameters, StartKey)
 	++ Parameters
 	++ start_key(StartKey),
     request(?TG_QUERY, JSON).
+
+%%% Scan a table
+
+-spec scan(tablename(), json_parameters()) -> json_reply().
+
+scan(Name, Parameters) ->
+    scan(Name, Parameters, 'none').
+
+%% Scan a table with pagination
+
+-spec scan(tablename(), json_parameters(), json() | 'none') -> json_reply().
+
+scan(Name, Parameters, StartKey)
+  when is_binary(Name),
+       is_list(Parameters) ->
+    JSON = [{<<"TableName">>, Name}]
+	++ Parameters
+	++ start_key(StartKey),
+    request(?TG_SCAN, JSON).
 
 %%%
 %%% Helper functions
