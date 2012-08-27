@@ -303,7 +303,8 @@ get(Name, Keys)
   when is_binary(Name),
        is_list(Keys) ->
     JSON = [{<<"TableName">>, Name}] ++ Keys,
-    request(?TG_GET_ITEM, JSON).
+    decode_binary_item(
+      request(?TG_GET_ITEM, JSON)).
 
 %%% get with additional parameters
 
@@ -315,7 +316,8 @@ get(Name, Keys, Parameters)
     JSON = [{<<"TableName">>, Name}] 
 	++ Keys
 	++ Parameters,
-    request(?TG_GET_ITEM, JSON).
+    decode_binary_item(
+      request(?TG_GET_ITEM, JSON)).
 
 %%% Fetch all item attributes from table using a condition.
 
@@ -397,7 +399,8 @@ scan(Name, Parameters, StartKey)
     JSON = [{<<"TableName">>, Name}]
 	++ Parameters
 	++ start_key(StartKey),
-    request(?TG_SCAN, JSON).
+    decode_binary_item_list(
+      request(?TG_SCAN, JSON)).
 
 %%%
 %%% Helper functions
@@ -413,14 +416,14 @@ start_key(StartKey) ->
 
 format_put_attrs(Attributes) ->
     lists:map(fun({Name, Value, Type}) ->
-                      {Name, [{type(Type), Value}]}
+                      {Name, [{type(Type), encode_if_binary(Type, Value)}]}
               end, Attributes).
 
 -spec format_update_attrs([update_attr()]) -> json().
 
 format_update_attrs(Attributes) ->
     lists:map(fun({Name, Value, Type, Action}) ->
-                      {Name, [{<<"Value">>, [{type(Type), Value}]},
+                      {Name, [{<<"Value">>, [{type(Type), encode_if_binary(Type, Value)}]},
                               {<<"Action">>, update_action(Action)}]};
                  ({Name, 'delete'}) ->
                       {Name, [{<<"Action">>, update_action('delete')}]}
@@ -432,14 +435,59 @@ format_update_cond({'does_not_exist', Name}) ->
     [{<<"Expected">>, [{Name, [{<<"Exists">>, <<"false">>}]}]}];
 
 format_update_cond({'exists', Name, Value, Type}) -> 
-    [{<<"Expected">>, [{Name, [{<<"Value">>, [{type(Type), Value}]}]}]}].
-     
+    [{<<"Expected">>, [{Name, [{<<"Value">>, [{type(Type), encode_if_binary(Type, Value)}]}]}]}].
+   
+-spec decode_binary_kvs([{binary(), term()}]) -> [{binary(), term()}].
+decode_binary_kvs(KVs) ->
+    [ {Key, [decode_if_binary(V) || V <-  Values]} 
+      || {Key, Values} <- KVs ].
+                               
+-spec decode_binary_item(Resp::{ok|error, [{binary(), term()}]}) -> [{binary(), term()}].
+decode_binary_item({ok, Resp}) ->
+    {ok, lists:map(fun({<<"Item">>, KVs}) ->
+                           decode_binary_kvs(KVs);
+                      (Other) ->
+                           Other
+                   end,
+                   Resp)};
+decode_binary_item(Other) ->
+    Other.
+
+-spec decode_binary_item_list(Resp::{ok|error, [{binary(), term()}]}) -> [{binary(), term()}].
+decode_binary_item_list({ok, Resp}) ->
+    {ok, lists:map(fun({<<"Items">>, Items}) ->
+                           [ decode_binary_kvs(KVs) || KVs <- Items ];
+                      (Other) ->
+                           Other
+                   end,
+                   Resp)};
+decode_binary_item_list(Other) ->
+    Other.
+
+-spec decode_if_binary({binary(), binary()|list()}) -> {binary(), binary()}.
+decode_if_binary({<<"B">>, Binary}) when is_binary(Binary) ->
+    {<<"B">>, base64:decode(Binary)};
+decode_if_binary({<<"BS">>, BinaryList}) when is_list(BinaryList) ->
+    {<<"BS">>, [base64:decode(B) || B <- BinaryList]};
+decode_if_binary(Other) ->
+    Other.                              
+
+-spec encode_if_binary(Type::type(), Value::binary()) -> binary().
+encode_if_binary('binary', Value) when is_binary(Value) ->
+    base64:encode(Value);
+encode_if_binary(['binary'], Value) when is_list(Value) ->
+    [ base64:encode(V) || V <- Value ];
+encode_if_binary(_, Value) ->
+    Value.
+  
 -spec type(type()) -> binary().
 
 type('string') -> <<"S">>;
 type('number') -> <<"N">>;
+type('binary') -> <<"B">>;
 type(['string']) -> <<"SS">>;
-type(['number']) -> <<"NN">>.
+type(['number']) -> <<"NS">>;
+type(['binary']) -> <<"BS">>.
 
 -spec returns(returns()) -> binary().
 
