@@ -445,7 +445,7 @@ decode_binary_kvs(KVs) ->
 -spec decode_binary_item(Resp::{ok|error, [{binary(), term()}]}) -> [{binary(), term()}].
 decode_binary_item({ok, Resp}) ->
     {ok, lists:map(fun({<<"Item">>, KVs}) ->
-                           decode_binary_kvs(KVs);
+                           {<<"Item">>, decode_binary_kvs(KVs)};
                       (Other) ->
                            Other
                    end,
@@ -456,7 +456,8 @@ decode_binary_item(Other) ->
 -spec decode_binary_item_list(Resp::{ok|error, [{binary(), term()}]}) -> [{binary(), term()}].
 decode_binary_item_list({ok, Resp}) ->
     {ok, lists:map(fun({<<"Items">>, Items}) ->
-                           [ decode_binary_kvs(KVs) || KVs <- Items ];
+                           {<<"Items">>, 
+                            [ decode_binary_kvs(KVs) || KVs <- Items ]};
                       (Other) ->
                            Other
                    end,
