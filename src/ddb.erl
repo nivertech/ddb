@@ -25,14 +25,14 @@
 
 -export([credentials/3, tables/0,
          key_type/2, key_type/4,
-         key_value/2, key_value/4,
+         start_key_value/2, key_value/2, key_value/4,
          create_table/4, describe_table/1, remove_table/1,
          get/2, get/3, put/2, update/3, update/4, 
          delete/2, delete/3, 
 	 cond_put/3,
          cond_update/4, cond_update/5,
          cond_delete/3, cond_delete/4,
-         now/0, find/3, find/4,
+         now/0, find/3, find/4, scan/3,
 	 q/3, q/4,
 	 scan/2, scan/3,
 	 range_key_condition/1]).
@@ -43,6 +43,7 @@
 
 -define(SIGNATURE_METHOD, "HmacSHA1").
 -define(MAX_RETRIES, 4).
+-define(REQUEST_TIMEOUT_MS, 1000). 
 
 %%% Request headers
 
@@ -197,6 +198,15 @@ cond_put(Name, Attributes, Condition)
 
 %%% Create a key value, either hash or hash and range.
 
+
+-spec start_key_value(binary(), type()) -> json().
+
+start_key_value(HashKeyValue, HashKeyType)
+  when is_binary(HashKeyValue),
+       is_atom(HashKeyType) ->
+    [{<<"HashKeyElement">>, 
+      [{type(HashKeyType), HashKeyValue}]}].
+
 -spec key_value(binary(), type()) -> json().
 
 key_value(HashKeyValue, HashKeyType)
@@ -340,6 +350,18 @@ find(Name, {HashKeyValue, HashKeyType}, RangeKeyCond, StartKey)
 
     request(?TG_QUERY, JSON).
 
+%%% Scan all items
+
+-spec scan(tablename(), non_neg_integer(), json()|'none') -> json_reply().
+
+scan(Name, Limit, StartKey) 
+  when is_binary(Name),
+       Limit > 0 ->
+    JSON = (start_key(StartKey) ++ 
+            [{<<"TableName">>, Name},
+             {<<"Limit">>    , Limit}]),
+    request(?TG_SCAN, JSON).
+
 %%% Create a range key condition parameter
 
 -spec range_key_condition(find_cond()) -> json_parameter().
@@ -439,7 +461,7 @@ format_update_cond({'exists', Name, Value, Type}) ->
 type('string') -> <<"S">>;
 type('number') -> <<"N">>;
 type(['string']) -> <<"SS">>;
-type(['number']) -> <<"NN">>.
+type(['number']) -> <<"NS">>.
 
 -spec returns(returns()) -> binary().
 
@@ -462,7 +484,7 @@ request(Target, JSON) ->
     ok = lager:debug("REQUEST BODY ~n~p", [Body]),
     Headers = headers(Target, Body),
     Opts = [{'response_format', 'binary'}],
-    F = fun() -> ibrowse:send_req(?DDB_ENDPOINT, [{'Content-type', ?CONTENT_TYPE} | Headers], 'post', Body, Opts) end,
+    F = fun() -> ibrowse:send_req(?DDB_ENDPOINT, [{'Content-type', ?CONTENT_TYPE} | Headers], 'post', Body, Opts, ?REQUEST_TIMEOUT_MS) end,
     case ddb_aws:retry(F, ?MAX_RETRIES, fun jsx:json_to_term/1) of
 	{'error', 'expired_token'} ->
 	    {ok, Key, Secret, Token} = ddb_iam:token(129600),
