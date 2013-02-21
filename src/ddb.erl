@@ -34,7 +34,7 @@
          cond_delete/3, cond_delete/4,
          now/0, find/3, find/4, scan/3,
 	 q/3, q/4,
-	 scan/2, scan/3,
+	 scan/2, scan_limit/3,
 	 range_key_condition/1]).
 
 -define(DDB_DOMAIN, "dynamodb.us-east-1.amazonaws.com").
@@ -354,9 +354,9 @@ find(Name, {HashKeyValue, HashKeyType}, RangeKeyCond, StartKey)
 
 %%% Scan all items
 
--spec scan(tablename(), non_neg_integer(), json()|'none') -> json_reply().
+-spec scan_limit(tablename(), non_neg_integer(), json()|'none') -> json_reply().
 
-scan(Name, Limit, StartKey) 
+scan_limit(Name, Limit, StartKey) 
   when is_binary(Name),
        Limit > 0 ->
     JSON = (start_key(StartKey) ++ 
